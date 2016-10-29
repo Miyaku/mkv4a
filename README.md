@@ -13,7 +13,7 @@ SDK21- use V4A Material<br /></blockquote>
 * Custom Recovery TWRP<br />
 
 ##Installing
-* Download the zip from release page<br />
+* Download the <a href="https://github.com/Miyaku/mkv4a/releases/download/v1.1-stable/mkv4a.zip">mkv4a.zip</a> from release page<br />
 * Flash via TWRP
 
 ## Troubleshooting
