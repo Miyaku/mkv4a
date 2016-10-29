@@ -1,0 +1,187 @@
+#!/sbin/sh
+OUTFD=$2
+ZIP=$3
+
+SYSTEMLIB=/system/lib
+
+ui_print() {
+  echo -n -e "ui_print $1\n" > /proc/self/fd/$OUTFD
+  echo -n -e "ui_print\n" > /proc/self/fd/$OUTFD
+}
+
+ch_con() {
+  LD_LIBRARY_PATH=$SYSTEMLIB /system/toolbox chcon -h u:object_r:system_file:s0 $1
+  LD_LIBRARY_PATH=$SYSTEMLIB /system/bin/toolbox chcon -h u:object_r:system_file:s0 $1
+  chcon -h u:object_r:system_file:s0 $1
+  LD_LIBRARY_PATH=$SYSTEMLIB /system/toolbox chcon u:object_r:system_file:s0 $1
+  LD_LIBRARY_PATH=$SYSTEMLIB /system/bin/toolbox chcon u:object_r:system_file:s0 $1
+  chcon u:object_r:system_file:s0 $1
+}
+
+ch_con_ext() {
+  LD_LIBRARY_PATH=$SYSTEMLIB /system/toolbox chcon $2 $1
+  LD_LIBRARY_PATH=$SYSTEMLIB /system/bin/toolbox chcon $2 $1
+  chcon $2 $1
+}
+
+ln_con() {
+  LD_LIBRARY_PATH=$SYSTEMLIB /system/toolbox ln -s $1 $2
+  LD_LIBRARY_PATH=$SYSTEMLIB /system/bin/toolbox ln -s $1 $2
+  ln -s $1 $2
+  ch_con $2
+}
+
+set_perm() {
+  chown $1.$2 $4
+  chown $1:$2 $4
+  chmod $3 $4
+  ch_con $4
+  ch_con_ext $4 $5
+}
+
+cp_perm() {
+  rm $5
+  if [ -f "$4" ]; then
+    cat $4 > $5
+    set_perm $1 $2 $3 $5 $6
+  fi
+}
+
+cat /system/bin/toolbox > /system/toolbox
+chmod 0755 /system/toolbox
+ch_con /system/toolbox
+ui_print ""
+ui_print "######################################"
+ui_print "~   ViPER4Android Ainstaller   ~"
+ui_print "=> Script Writting by Miya 04/09/16 <="
+ui_print "-> forum.mifans.web.id <-"
+ui_print "######################################"
+ui_print ""
+
+ui_print "1. Meyiapkan..."
+ui_print ""
+ui_print "2. Membuka /system..."
+mount /system
+mount -o rw,remount /system
+mount -o rw,remount /system /system
+
+ui_print "3. Memeriksa versi lawas..."
+rm -rf /system/app/ViPER4Android*
+rm -rf /system/priv-app/ViPER4Android*
+rm -rf /system/lib/soundfx/libswdap-mod.so
+rm -rf /system/lib/soundfx/libv4a*
+rm -rf /system/vendor/etc/lib/soundfx/libv4a*
+
+ui_print "4. Mencari konfigurasi efek sound..."
+CONFIG_FILE=/system/etc/audio_effects.conf
+VENDOR_CONFIG=/system/vendor/etc/audio_effects.conf
+
+ui_print "5. Ditemukan dan akan di patch..."
+if [ -f $VENDOR_CONFIG ];
+then
+	ui_print "6. Memeriksa konfigurasi..."
+	sed -i '/v4a_fx {/,/}/d' $VENDOR_CONFIG
+	sed -i '/v4a_standard_fx {/,/}/d' $VENDOR_CONFIG
+fi
+
+
+sed -i '/v4a_fx {/,/}/d' $CONFIG_FILE
+sed -i '/v4a_standard_fx {/,/}/d' $CONFIG_FILE
+
+ui_print "7. Membuat cadangan..."
+cd /tmp
+mkdir mv4a
+cd mv4a
+unzip -o "$ZIP"
+
+ui_print "8. Menyalin lib ke /system..."
+
+cp_perm 0 0 0644 /tmp/mv4a/M/lib/soundfx/libv4a.so /system/lib/soundfx/libv4a.so
+cp_perm 0 0 0644 /tmp/mv4a/M/lib/libV4AJniUtils.so /system/lib/libV4AJniUtils.so
+
+ui_print "9. Memeriksa versi android..."
+API=$(cat /system/build.prop | grep "ro.build.version.sdk=" | dd bs=1 skip=21 count=2)
+
+if [ "$API" -ge "21" ];
+then
+	ui_print "10. Terdeteksi Android SDK21+ L/M/N"
+	ui_print "10.1 Pastikan mode SELinux Permissive"
+	cp_perm 0 0 0644 /tmp/mv4a/V4AVi /system/etc/V4AVi
+	cp_perm 0 0 0755 /tmp/mv4a//su.d/50viper.sh /system/etc/init.d/18viper
+	cp_perm 0 0 0755 /tmp/mv4a/su.d/enforce.sh /system/etc/init.d/17enforce
+	ui_print "10.2 Membuat dukungan SELinux untuk SuperSU"
+	mkdir -p /system/su.d
+	set perm 0 0 0755 /system/su.d
+	cp_perm 0 0 0755 /tmp/mv4a/su.d/50viper.sh /system/su.d/50viper.sh
+	cp_perm 0 0 0755 /tmp/mv4a/su.d/enforce.sh /system/su.d/enforce.sh
+	ui_print "10.3 OK. Menyalin berkas ke /system..."
+	mkdir -p /system/priv-app/ViPER4Android
+	set_perm 0 0 0755 /system/priv-app/ViPER4Android
+	cp_perm 0 0 0644 /tmp/mv4a/M/ViPER4Android/ViPER4Android.apk /system/priv-app/ViPER4Android/ViPER4Android.apk
+	mkdir -p /system/priv-app/ViPER4Android/lib
+	set_perm 0 0 0755 /system/priv-app/ViPER4Android/lib
+	mkdir -p /system/priv-app/ViPER4Android/lib/arm
+	set_perm 0 0 0755 /system/priv-app/ViPER4Android/lib/arm
+	cp_perm 0 0 0644 /tmp/mv4a/M/lib/libV4AJniUtils.so /system/priv-app/ViPER4Android/lib/arm/libV4AJniUtils.so
+else
+	ui_print "10. Terdeteksi Android di bawah SDK21"
+	cp_perm 0 0 0644 /tmp/mv4a/V4AVi /system/etc/V4AVi
+	cp_perm 0 0 0644 /tmp/mv4a/M/ViPER4Android/v4asdk-21.apk /system/app/v4asdk-21.apk
+fi
+cp_perm 0 0 0644 /tmp/mv4a/V4AVi /system/V4AVi
+
+# Install rom backup script 
+if [ -d /system/addon.d ]; 
+then
+	cp_perm 0 0 0755 /tmp/mv4a/M/ayo.sh /system/addon.d/ayo.sh
+fi
+
+ui_print "11. Mengepatch $CONFIG_FILE"
+
+# If vendor exists, patch it
+if [ -f $VENDOR_CONFIG ];
+then
+	# Add libary
+	sed -i 's/^libraries {/libraries {\n  v4a_fx {\n    path \/system\/lib\/soundfx\/libv4a.so\n  }/g' $VENDOR_CONFIG
+	
+	# Add effect
+	sed -i 's/^effects {/effects {\n  v4a_standard_fx {\n    library v4a_fx\n    uuid 41d3c987-e6cf-11e3-a88a-11aba5d5c51b\n  }/g' $VENDOR_CONFIG
+fi
+
+# Add libary
+sed -i 's/^libraries {/libraries {\n  v4a_fx {\n    path \/system\/lib\/soundfx\/libv4a.so\n  }/g' $CONFIG_FILE
+
+# Add effect
+sed -i 's/^effects {/effects {\n  v4a_standard_fx {\n    library v4a_fx\n    uuid 41d3c987-e6cf-11e3-a88a-11aba5d5c51b\n  }/g' $CONFIG_FILE
+
+# Compatible Build
+ui_print "12. Mengepatch /system/build.prop..."
+echo " " >> /system/build.prop
+echo "## ViPER4Android Ainstaller by Miya ##" >> /system/build.prop
+echo "lpa.decode=false" >> /system/build.prop
+echo "tunnel.decode=false" >> /system/build.prop
+echo "lpa.use-stagefright=false" >> /system/build.prop
+echo "tunnel.audiovideo.decode=false" >> /system/build.prop
+echo "lpa.releaselock=false" >> /system/build.prop
+echo "persist.sys.media.use-awesome=1" >> /system/build.prop
+echo "af.resampler.quality=255" >> /system/build.prop
+echo "persist.af.resampler.quality=255" >> /system/build.prop
+echo "persist.dev.pm.dyn_samplingrate=1" >> /system/build.prop
+echo "audio.deep_buffer.media=false" >> /system/build.prop
+echo "## End of Compatible V4A ##" >> /system/build.prop
+echo " " >> /system/build.prop
+# Cleanup
+ui_print "13. Membersihkan cadangan..."
+rm /system/toolbox
+rm -rf /tmp/mv4a
+ui_print "14. Menutup system..."
+umount /system
+ui_print "######################################"
+ui_print "Yey! Berhasil di install..!!!"
+ui_print ""
+ui_print "Pack by Inisial M"
+ui_print "http://Miyaku.github.io"
+ui_print ""
+ui_print "Heppi Dug Dess..!!"
+ui_print "######################################"
+
